@@ -1,5 +1,3 @@
-
-
 package store
 
 import "sync"
