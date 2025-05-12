@@ -5,115 +5,122 @@ import (
 	"errors"
 	"fmt"
 
-	bolt "go.etcd.io/bbolt"
+	"github.com/dgraph-io/badger/v4"
 )
 
 var (
-	defaultBucket  = []byte("default")
-	replicaBucket  = []byte("replication")
+	replicaPrefix = []byte("replica:")
 )
 
-// Database is an open bolt database.
+// Database wraps a Badger DB instance.
 type Database struct {
-	db       *bolt.DB
+	db       *badger.DB
 	readOnly bool
 }
 
-// NewDatabase returns an instance of a database that we can work with.
+// NewDatabase initializes and returns a new Badger database.
 func NewDatabase(dbPath string, readOnly bool) (*Database, func() error, error) {
-	boltDb, err := bolt.Open(dbPath, 0o600, nil)
+	opts := badger.DefaultOptions(dbPath).WithReadOnly(readOnly)
+	db, err := badger.Open(opts)
 	if err != nil {
 		return nil, nil, err
 	}
 
-	database := &Database{db: boltDb, readOnly: readOnly}
 	closeFunc := func() error {
-		return boltDb.Close()
+		return db.Close()
 	}
 
-	if err := database.createBuckets(); err != nil {
-		closeFunc()
-		return nil, nil, fmt.Errorf("creating default bucket: %w", err)
-	}
-
-	return database, closeFunc, nil
+	return &Database{db: db, readOnly: readOnly}, closeFunc, nil
 }
 
-func (d *Database) createBuckets() error {
-	return d.db.Update(func(tx *bolt.Tx) error {
-		if _, err := tx.CreateBucketIfNotExists(defaultBucket); err != nil {
-			return err
-		}
-		if _, err := tx.CreateBucketIfNotExists(replicaBucket); err != nil {
-			return err
-		}
-		return nil
-	})
+// prefixKey adds a prefix for replication keys
+func prefixKey(prefix, key []byte) []byte {
+	return append(prefix, key...)
 }
 
+// SetKey writes a key to the main store and the replication queue.
 func (d *Database) SetKey(key string, value []byte) error {
 	if d.readOnly {
 		return errors.New("read-only mode")
 	}
 
-	return d.db.Update(func(tx *bolt.Tx) error {
-		if err := tx.Bucket(defaultBucket).Put([]byte(key), value); err != nil {
+	return d.db.Update(func(txn *badger.Txn) error {
+		if err := txn.Set([]byte(key), value); err != nil {
 			return err
 		}
-		return tx.Bucket(replicaBucket).Put([]byte(key), value)
+		return txn.Set(prefixKey(replicaPrefix, []byte(key)), value)
 	})
 }
 
+// SetKeyOnReplica writes a key directly to the main store (used by replicas).
 func (d *Database) SetKeyOnReplica(key string, value []byte) error {
-	return d.db.Update(func(tx *bolt.Tx) error {
-		return tx.Bucket(defaultBucket).Put([]byte(key), value)
+	return d.db.Update(func(txn *badger.Txn) error {
+		return txn.Set([]byte(key), value)
 	})
 }
 
-func copyByteSlice(b []byte) []byte {
-	if b == nil {
-		return nil
-	}
-	res := make([]byte, len(b))
-	copy(res, b)
-	return res
-}
-
+// GetNextKeyForReplication fetches the first replication entry.
 func (d *Database) GetNextKeyForReplication() ([]byte, []byte, error) {
-	var key, value []byte
-	err := d.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(replicaBucket)
-		k, v := b.Cursor().First()
-		key = copyByteSlice(k)
-		value = copyByteSlice(v)
+	var k, v []byte
+	err := d.db.View(func(txn *badger.Txn) error {
+		opts := badger.DefaultIteratorOptions
+		it := txn.NewIterator(opts)
+		defer it.Close()
+
+		for it.Seek(replicaPrefix); it.ValidForPrefix(replicaPrefix); it.Next() {
+			item := it.Item()
+			key := item.KeyCopy(nil)
+			err := item.Value(func(val []byte) error {
+				k = key[len(replicaPrefix):] // Strip prefix
+				v = append([]byte{}, val...)
+				return nil
+			})
+			return err
+		}
 		return nil
 	})
+
 	if err != nil {
 		return nil, nil, err
 	}
-	return key, value, nil
+	return k, v, nil
 }
 
+// DeleteReplicationKey deletes a key from the replication queue if the value matches.
 func (d *Database) DeleteReplicationKey(key, value []byte) error {
-	return d.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(replicaBucket)
-		v := b.Get(key)
-		if v == nil {
-			return errors.New("key does not exist")
+	prefixedKey := prefixKey(replicaPrefix, key)
+	return d.db.Update(func(txn *badger.Txn) error {
+		item, err := txn.Get(prefixedKey)
+		if err != nil {
+			return err
 		}
-		if !bytes.Equal(v, value) {
+		var actual []byte
+		err = item.Value(func(val []byte) error {
+			actual = val
+			return nil
+		})
+		if err != nil {
+			return err
+		}
+		if !bytes.Equal(actual, value) {
 			return errors.New("value does not match")
 		}
-		return b.Delete(key)
+		return txn.Delete(prefixedKey)
 	})
 }
 
+// GetKey retrieves a key's value from the main store.
 func (d *Database) GetKey(key string) ([]byte, error) {
 	var result []byte
-	err := d.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(defaultBucket)
-		result = copyByteSlice(b.Get([]byte(key)))
-		return nil
+	err := d.db.View(func(txn *badger.Txn) error {
+		item, err := txn.Get([]byte(key))
+		if err != nil {
+			return err
+		}
+		return item.Value(func(val []byte) error {
+			result = append([]byte{}, val...)
+			return nil
+		})
 	})
 	if err != nil {
 		return nil, err
@@ -121,27 +128,33 @@ func (d *Database) GetKey(key string) ([]byte, error) {
 	return result, nil
 }
 
+// DeleteExtraKeys removes keys that don't belong to this shard.
 func (d *Database) DeleteExtraKeys(isExtra func(string) bool) error {
-	var keys []string
+	var keysToDelete [][]byte
 
-	err := d.db.View(func(tx *bolt.Tx) error {
-		b := tx.Bucket(defaultBucket)
-		return b.ForEach(func(k, v []byte) error {
-			ks := string(k)
-			if isExtra(ks) {
-				keys = append(keys, ks)
+	err := d.db.View(func(txn *badger.Txn) error {
+		it := txn.NewIterator(badger.DefaultIteratorOptions)
+		defer it.Close()
+
+		for it.Rewind(); it.Valid(); it.Next() {
+			key := it.Item().Key()
+			if bytes.HasPrefix(key, replicaPrefix) {
+				continue // skip replica entries
 			}
-			return nil
-		})
+			kStr := string(key)
+			if isExtra(kStr) {
+				keysToDelete = append(keysToDelete, append([]byte{}, key...))
+			}
+		}
+		return nil
 	})
 	if err != nil {
 		return err
 	}
 
-	return d.db.Update(func(tx *bolt.Tx) error {
-		b := tx.Bucket(defaultBucket)
-		for _, k := range keys {
-			if err := b.Delete([]byte(k)); err != nil {
+	return d.db.Update(func(txn *badger.Txn) error {
+		for _, k := range keysToDelete {
+			if err := txn.Delete(k); err != nil {
 				return err
 			}
 		}

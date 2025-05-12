@@ -2,6 +2,7 @@ package store
 
 import "sync"
 
+
 var kv = struct {
 	sync.RWMutex
 	data map[string]string
