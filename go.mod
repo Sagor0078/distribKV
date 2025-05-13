@@ -1,8 +1,11 @@
-module distribKV
+module github.com/Sagor0078/distribKV
 
 go 1.24.1
 
-require github.com/dgraph-io/badger/v4 v4.7.0
+require (
+	github.com/BurntSushi/toml v1.5.0
+	github.com/dgraph-io/badger/v4 v4.7.0
+)
 
 require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect

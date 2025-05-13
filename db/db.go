@@ -88,26 +88,31 @@ func (d *Database) GetNextKeyForReplication() ([]byte, []byte, error) {
 
 // DeleteReplicationKey deletes a key from the replication queue if the value matches.
 func (d *Database) DeleteReplicationKey(key, value []byte) error {
-	prefixedKey := prefixKey(replicaPrefix, key)
-	return d.db.Update(func(txn *badger.Txn) error {
-		item, err := txn.Get(prefixedKey)
-		if err != nil {
-			return err
-		}
-		var actual []byte
-		err = item.Value(func(val []byte) error {
-			actual = val
-			return nil
-		})
-		if err != nil {
-			return err
-		}
-		if !bytes.Equal(actual, value) {
-			return errors.New("value does not match")
-		}
-		return txn.Delete(prefixedKey)
-	})
+    prefixedKey := prefixKey(replicaPrefix, key)
+    return d.db.Update(func(txn *badger.Txn) error {
+        item, err := txn.Get(prefixedKey)
+        if err != nil {
+            return err
+        }
+
+        var actual []byte
+        err = item.Value(func(val []byte) error {
+            actual = val
+            return nil
+        })
+        if err != nil {
+            return err
+        }
+
+        if !bytes.Equal(actual, value) {
+            return fmt.Errorf("value mismatch for key %s: expected %s, got %s", key, value, actual)
+        }
+
+        // Proceed with deletion
+        return txn.Delete(prefixedKey)
+    })
 }
+
 
 // GetKey retrieves a key's value from the main store.
 func (d *Database) GetKey(key string) ([]byte, error) {
