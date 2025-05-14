@@ -1,11 +1,15 @@
 
-# distribKV – A Distributed Key-Value Store in Go
+# A Distributed Key-Value Store in Go
 
 **distribKV** is a distributed key-value store written in Go. It supports sharding, replication, client-side routing, LSM-based storage (BadgerDB), and more.
 
 [![Directory docs](img/replica.png)](https://github.com/Sagor0078/distribKV)
 
 ---
+
+> [!NOTE]
+> This project is for **educational purposes** — to understand how a **key-value store** works under the hood along with the theoretical concepts of **sharding, replication, LSM trees, consistency models**, and **distributed systems**.
+
 
 ## 📦 Features
 
