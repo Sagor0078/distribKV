@@ -1,50 +1,127 @@
-# distribKV
 
-distribKV is a distributed key-value database implemented in Go. It supports horizontal scaling through sharding and ensures high availability via leader-based replication. The system is designed for resilience, scalability, and performance, making it suitable for learning and experimentation with distributed systems concepts.
+# distribKV – A Distributed Key-Value Store in Go
+
+**distribKV** is a distributed key-value store written in Go. It supports sharding, replication, client-side routing, LSM-based storage (BadgerDB), and more.
 
 [![Directory docs](img/replica.png)](https://github.com/Sagor0078/distribKV)
 
+---
+
+## 📦 Features
+
+- **Sharding & Replication** with configurable leaders and replicas
+- **Client-side Routing** with HTTP redirection
+- **LSM-Tree Storage** using BadgerDB
+- **Benchmarking Tools** for performance testing
+- **Concurrency** via Goroutines
+- **Persistence** with Write-Ahead Logging and Compaction
+- Built with Go 1.24+ and designed for extensibility
+
+---
+
+## System Design & Architecture
+
+This distributed key-value store is built with modern distributed systems principles, ensuring scalability, fault tolerance, and high availability.
+
+### Distributed Systems Fundamentals
+
+- **Sharding**  
+  Data is partitioned across multiple nodes based on a hash or shard index. This reduces load on individual nodes and enables horizontal scalability.
+
+- **Replication**  
+  Maintains multiple copies (replicas) of data across nodes for fault tolerance and high availability. Uses a **leader–follower model**, where the leader node handles all writes and followers synchronize data.
+
+---
+
+### Consistency Models
+
+- **Eventual Consistency**  
+  After a write, data is eventually replicated to all nodes, ensuring convergence over time.
+
+- **Leader-based Replication**  
+  A single leader node handles all writes. Follower nodes replicate updates to maintain consistency.
+
+---
+
+### Client-side Routing & Redirection
+
+- **Key-based Routing**  
+  Clients use consistent hashing to determine the shard responsible for a key.
+
+- **Redirection**  
+  If a request hits the wrong shard or non-leader replica, it is redirected using HTTP `307` or `308` status codes to the correct node.
+
+---
+
+### Persistence and Storage
+
+- **BadgerDB (LSM Tree) and SSTables**  
+  Uses [BadgerDB](https://github.com/dgraph-io/badger), an embeddable key-value store inspired by RocksDB and LevelDB. It implements a **Log-Structured Merge Tree (LSM)** architecture for high write throughput and efficient storage management.
+
+  - **LSM Tree**: Writes are first stored in memory (MemTable) and periodically flushed to disk as immutable **Sorted String Tables (SSTables)**.
+  - **Write-Ahead Log (WAL)**: Ensures durability by logging changes before applying them.
+  - **Compaction**: Periodically merges SSTables to optimize read performance and reclaim storage space.
 
 
-## Core Theoretical Concepts
-1. Distributed Systems Fundamentals
+---
 
-    Sharding: Data is partitioned across multiple nodes based on a hash or shard index, reducing load and improving scalability.
+### Scaling Types
 
-    Replication: Maintains copies (replicas) of data for fault tolerance and high availability. Typically employs a leader–follower model where the leader handles writes, and replicas synchronize data.
+- **Horizontal Scaling (Scale-Out)**  
+  The system supports adding more nodes (shards or replicas) to distribute the load. Keys are partitioned across shards using consistent hashing, allowing efficient horizontal growth.
 
-2. Consistency Models
+- **Vertical Scaling (Scale-Up)**  
+  Each node can independently handle increased load by using efficient concurrency with Goroutines and optimizing storage with BadgerDB’s low-overhead design.
 
-    Eventual Consistency: After a write, data is eventually replicated and becomes consistent across all nodes.
+- **Shard-Based Partitioning**  
+  Data is divided across shards by hashing keys. Each shard can be independently scaled with its own replicas and leaders.
 
-    Leader-based Replication: A designated node accepts writes, and followers replicate data from it, ensuring consistency.
+- **Replication-Based Scaling**  
+  Read operations are offloaded to replicas, reducing the load on leader nodes and improving throughput.
 
-3. Client-side Routing & Redirection
+---
 
-    Clients hash keys to determine the appropriate shard to contact.
+### Concurrency & Benchmarking
 
-    If a request reaches the wrong shard, it may be redirected using HTTP status codes like 307 or 308.
+- **Goroutines**  
+  Efficient parallelism using lightweight Go goroutines for concurrent `GET`/`SET` requests.
 
-4. Persistence and Storage
+- **Benchmarking**  
+  Tools for measuring:
+  - Throughput (requests/sec)
+  - Latency (response times)
+  - Load performance
 
-    LSM Tree Concepts via BadgerDB: Utilizes a write-optimized storage engine inspired by RocksDB/LevelDB for efficient data storage.
+---
 
-    Write-Ahead Logging & Compaction: Ensures durability and facilitates crash recovery through logging and data compaction mechanisms.
+### Fault Tolerance & Resilience
 
-5. Concurrency and Benchmarking
+- **Replication**  
+  Replicas allow the system to survive leader failures without data loss.
 
-    Handles concurrent GET/SET operations using Goroutines for efficient parallel processing.
+- **Data Synchronization**  
+  Periodic syncing ensures eventual consistency between leader and replicas.
 
-    Includes benchmarking tools to measure throughput, latency, and performance under various workloads.
+---
 
-6. Fault Tolerance & Resilience
+### CAP Theorem Trade-offs
 
-    Employs redundancy via replicas to maintain operation continuity even if a leader node fails.
+> “You can only choose two: **Consistency**, **Availability**, **Partition Tolerance**.”
 
-    Implements data synchronization strategies to keep replicas up to date and consistent.
+**distribKV** favors:
 
-7. CAP Theorem
+- ✅ **Availability**
+- ✅ **Partition Tolerance**
+- 🚫 **(Relaxed) Consistency**
 
-    Demonstrates trade-offs among Consistency, Availability, and Partition Tolerance.
+Strong consistency can be added with protocols like Raft or Paxos in the future (LOL).
 
-    This system favors availability and partition tolerance, while sacrificing strict consistency unless strong synchronization protocols are added.
+---
+
+## Getting Started
+
+```bash
+git clone https://github.com/Sagor0078/distribKV.git
+cd distribKV
+```
+
