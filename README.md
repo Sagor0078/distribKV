@@ -8,7 +8,7 @@
 ---
 
 > [!NOTE]
-> This project is for **educational purposes** — to understand how a **key-value store** works under the hood along with the theoretical concepts of **sharding, replication, LSM trees, consistency models**, and **distributed systems**.
+> This project is for **educational purposes** — to understand how a **key-value store** works under the hood along with the theoretical concepts of **sharding, replication, LSM trees, consistency models**, **bloom filters**, and **distributed systems**.
 
 
 ## 📦 Features
@@ -19,7 +19,7 @@
 - **Benchmarking Tools** for performance testing
 - **Concurrency** via Goroutines
 - **Persistence** with Write-Ahead Logging and Compaction
-- Built with Go 1.24+ and designed for extensibility
+- Built with Go 1.24 and designed for extensibility
 
 ---
 
@@ -29,11 +29,11 @@ This distributed key-value store is built with modern distributed systems princi
 
 ### Distributed Systems Fundamentals
 
-- **Sharding**  
-  Data is partitioned across multiple nodes based on a hash or shard index. This reduces load on individual nodes and enables horizontal scalability.
+- **Sharding(static)**  
+  The distribKV project utilizes a static sharding technique. In static sharding, the dataset is partitioned across predefined shards based on a fixed configuration. Each shard is responsible for a specific subset of the data, and the mapping between data keys and shards is established at the time of system configuration. In distribKV, this configuration is specified in the sharding.toml file.
 
 - **Replication**  
-  Maintains multiple copies (replicas) of data across nodes for fault tolerance and high availability. Uses a **leader–follower model**, where the leader node handles all writes and followers synchronize data.
+  Maintains multiple copies (replicas) of data across nodes for fault tolerance and high availability. Uses a **leader–follower model or single leader replication**, where the leader node handles all writes and followers synchronize data.
 
 ---
 
@@ -65,7 +65,6 @@ This distributed key-value store is built with modern distributed systems princi
   - **LSM Tree**: Writes are first stored in memory (MemTable) and periodically flushed to disk as immutable **Sorted String Tables (SSTables)**.
   - **Write-Ahead Log (WAL)**: Ensures durability by logging changes before applying them.
   - **Compaction**: Periodically merges SSTables to optimize read performance and reclaim storage space.
-
 
 ---
 
