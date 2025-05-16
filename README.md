@@ -27,12 +27,6 @@
 - **Configuration-Driven** - TOML-based configuration for easy shard setup and management
 - **Persistence** with Write-Ahead Logging and Compaction
 - Built with Go 1.24 and designed for extensibility
-
----
-
-> [!NOTE]
-> This project is primarily for **educational purposes** to demonstrate distributed systems concepts including sharding, replication, LSM trees, bloom filters, and consistency models.
-
 ---
 
 ## Architecture
