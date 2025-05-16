@@ -1,30 +1,21 @@
-# distribKV: A Scalable Distributed Key-Value Store in Go
+
+# A Distributed Key-Value Store in Go
 
 <div align="center">
   <img src="img/replica.png" alt="distribKV Architecture" width="800">
-  <p><i>distribKV Architecture: Showcasing the sharding and replication model</i></p>
+  <p><i>distribKV Architecture: the sharding and replication model</i></p>
 </div>
 
-**distribKV** is a high-performance distributed key-value store written in Go, implementing modern distributed systems concepts including sharding, replication, and client-side routing. It provides a robust foundation for building scalable data storage solutions.
+**distribKV** is a distributed key-value store written in Go. It supports sharding, replication, client-side routing, LSM-based storage (BadgerDB), and more.
 
-## 📑 Table of Contents
 
-- [Features](#-features)
-- [Architecture](#️-architecture)
-- [System Design](#-system-design)
-  - [Sharding](#sharding)
-  - [Replication](#replication)
-  - [Storage Engine](#storage-badgerdb--lsm-trees)
-  - [Client Routing](#client-routing)
-- [API Endpoints](#-api-endpoints)
-- [Getting Started](#-getting-started)
-- [Consistency Model](#-consistency-model)
-- [Performance Benchmarks](#-performance-benchmarks)
-- [Future Enhancements](#-future-enhancements)
-- [References](#-references)
-- [License](#-license)
+---
 
-## 🚀 Features
+> [!NOTE]
+> This project is for **educational purposes** — to understand how a **key-value store** works under the hood along with the theoretical concepts of **sharding, replication, LSM trees, consistency models**, **bloom filters**, and **distributed systems**.
+
+
+## 📦 Features
 
 - **Static Sharding** - Horizontally partition data across multiple nodes to distribute load
 - **Leader-Follower Replication** - Fault tolerance with automatic leader-based replication
@@ -34,11 +25,17 @@
 - **Concurrent Request Handling** - Efficiently process parallel operations with Go's lightweight goroutines
 - **HTTP API** - Simple REST-style interface for key-value operations
 - **Configuration-Driven** - TOML-based configuration for easy shard setup and management
+- **Persistence** with Write-Ahead Logging and Compaction
+- Built with Go 1.24 and designed for extensibility
+
+---
 
 > [!NOTE]
 > This project is primarily for **educational purposes** to demonstrate distributed systems concepts including sharding, replication, LSM trees, bloom filters, and consistency models.
 
-## 🏛️ Architecture
+---
+
+## Architecture
 
 distribKV follows a multi-layered architecture designed for scalability and resilience:
 
@@ -62,6 +59,8 @@ distribKV follows a multi-layered architecture designed for scalability and resi
 5. For read operations:
    - Both leader and replica nodes can serve read requests
    - Reads on replicas may return slightly stale data (eventual consistency)
+
+--- 
 
 ## 💻 System Design
 
@@ -143,7 +142,9 @@ distribKV implements client-side routing to direct requests to the appropriate s
 3. Redirection includes the target node's address for direct future access
 4. Clients can optionally cache shard mapping for more efficient routing
 
-## ⚡ API Endpoints
+---
+
+## API Endpoints
 
 The API is HTTP-based with the following endpoints:
 
@@ -168,72 +169,9 @@ curl "http://127.0.0.2:8080/get?key=user123"
 # Health check
 curl "http://127.0.0.2:8080/healthz"
 ```
+---
 
-## 🚀 Getting Started
-
-### Prerequisites
-
-- Go 1.17 or later
-- Linux/macOS/Windows with bash support
-- Network with support for multiple IP addresses (for local testing)
-
-### Running the System
-
-1. **Clone the repository**:
-   ```bash
-   git clone https://github.com/Sagor0078/distribKV.git
-   cd distribKV
-   ```
-
-2. **Configure sharding**:
-   
-   Edit `sharding.toml` to match your desired shard configuration:
-   ```toml
-   [[shards]]
-   name = "shard-0"
-   idx = 0
-   address = "127.0.0.2:8080"
-   replicas = ["127.0.0.22:8080", "127.0.0.23:8080"]
-   ```
-
-3. **Launch the distributed system**:
-   ```bash
-   ./launch.sh
-   ```
-   This script builds the binary and starts multiple nodes (shards and replicas) as defined in `sharding.toml`.
-
-4. **Populate with test data** (optional):
-   ```bash
-   ./populate.sh
-   ```
-   This populates each shard with test key-value pairs.
-
-5. **Run benchmarks** (optional):
-   ```bash
-   ./bench.sh
-   ```
-   This runs performance tests to measure throughput and latency.
-
-### Development Setup
-
-To set up a development environment:
-
-1. Install Go dependencies:
-   ```bash
-   go mod download
-   ```
-
-2. Build the binary:
-   ```bash
-   go build -o distribKV
-   ```
-
-3. Run a single node for testing:
-   ```bash
-   ./distribKV -db-location=test.db -http-addr=127.0.0.1:8080 -config-file=sharding.toml -shard=shard-0
-   ```
-
-## 🧪 Consistency Model
+## Consistency Model
 
 distribKV implements **eventual consistency** to prioritize availability and partition tolerance:
 
@@ -245,62 +183,53 @@ distribKV implements **eventual consistency** to prioritize availability and par
 - **Convergence**: All replicas eventually reach the same state
 - **No Ordering Guarantees**: The system doesn't enforce global ordering of operations
 
-### CAP Theorem Trade-offs:
+### Concurrency & Benchmarking
 
-According to the [CAP theorem](https://en.wikipedia.org/wiki/CAP_theorem), distribKV prioritizes:
-- ✅ **Availability**: The system remains operational even during network partitions
-- ✅ **Partition Tolerance**: The system continues functioning despite network failures
-- 🚫 **Strong Consistency**: Relaxed in favor of eventual consistency
+- **Goroutines**  
+  Efficient parallelism using lightweight Go goroutines for concurrent `GET`/`SET` requests.
 
-### Consistency Scenarios:
+- **Benchmarking**  
+  Tools for measuring:
+  - Throughput (requests/sec)
+  - Latency (response times)
+  - Load performance
 
-1. **Read-after-Write**: A read immediately following a write may not see the updated value if served by a replica
-2. **Concurrent Writes**: Last-writer-wins semantics for concurrent updates to the same key
-3. **Network Partitions**: During partitions, replicas may become stale until connectivity is restored
+---
 
-## 📊 Performance Benchmarks
+### Fault Tolerance & Resilience
 
-distribKV has been benchmarked under various workloads using the included benchmark tools:
+- **Replication**  
+  Replicas allow the system to survive leader failures without data loss.
 
-### Single-Node Performance
+- **Data Synchronization**  
+  Periodic syncing ensures eventual consistency between leader and replicas.
 
-| Operation | Throughput | Latency (p50) | Latency (p99) |
-|-----------|------------|---------------|---------------|
-| GET       | ~50,000 ops/s | 1.2 ms | 3.5 ms |
-| SET       | ~30,000 ops/s | 2.1 ms | 5.8 ms |
+---
 
-### Distributed Performance (4 Shards, 8 Replicas)
+### CAP Theorem Trade-offs
 
-| Operation | Throughput | Latency (p50) | Latency (p99) |
-|-----------|------------|---------------|---------------|
-| GET       | ~180,000 ops/s | 1.8 ms | 7.2 ms |
-| SET       | ~95,000 ops/s | 3.4 ms | 12.1 ms |
+> “You can only choose two: **Consistency**, **Availability**, **Partition Tolerance**.”
 
-### Scaling Characteristics
+**distribKV** favors:
 
-- **Linear Read Scaling**: Read throughput increases linearly with additional replicas
-- **Sub-Linear Write Scaling**: Write throughput increases with additional shards but is limited by replication overhead
+- ✅ **Availability**
+- ✅ **Partition Tolerance**
+- 🚫 **(Relaxed) Consistency**
 
-## 🧩 Future Enhancements
+Strong consistency can be added with protocols like Raft or Paxos in the future (LOL).
 
-distribKV is designed to be extended. Some planned future enhancements include:
+---
 
-- **Dynamic Sharding**: Automatic rebalancing as data grows
-- **Stronger Consistency**: Optional strong consistency using consensus protocols (Raft/Paxos)
-- **Multi-Datacenter Replication**: Geographic distribution for lower latency
-- **Authentication and Access Control**: Security features for production use
-- **Advanced Compaction Strategies**: Optimize storage efficiency
-- **Monitoring and Telemetry**: Comprehensive observability
-- **Client Libraries**: Simplified integration for multiple languages
-- **Range Queries**: Support for key range scans and prefix queries
-
-## 📚 References
+## References
 
 This project draws inspiration from:
 - [Go, for Distributed Systems by Russ Cox](https://go.dev/talks/2013/distsys.slide#1)
 - [Designing Data-Intensive Applications by Martin Kleppmann](https://www.amazon.com/Designing-Data-Intensive-Applications-Reliable-Maintainable/dp/1449373321)
 - [Patterns of Distributed Systems by Unmesh Joshi](https://martinfowler.com/books/patterns-distributed.html)
-- [BadgerDB documentation](https://docs.hypermode.com/badger/overview)
-- [Bloom Filters - Theory and Practice](https://brilliant.org/wiki/bloom-filter)
-- [Consistent Hashing and Random Trees](https://dl.acm.org/doi/10.1145/258533.258660)
+- [Distributed key-value database series on YouTube](https://www.youtube.com/playlist?list=PLWwSgbaBp9XrMkjEhmTIC37WX2JfwZp7I)
+- [BadgerDB docs](https://docs.hypermode.com/badger/overview)
+- [Go package for bloom filters](https://github.com/bits-and-blooms/bloom)
+- [Arpit Bhayani short tutorials](https://www.youtube.com/@AsliEngineering)
+- [Consistent Hashing](https://www.hellointerview.com/learn/system-design/deep-dives/consistent-hashing)
+
 
