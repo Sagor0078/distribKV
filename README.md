@@ -65,13 +65,13 @@ This distributed key-value store is built with modern distributed systems princi
   - **LSM Tree**: Writes are first stored in memory (MemTable) and periodically flushed to disk as immutable **Sorted String Tables (SSTables)**.
   - **Write-Ahead Log (WAL)**: Ensures durability by logging changes before applying them.
   - **Compaction**: Periodically merges SSTables to optimize read performance and reclaim storage space.
-
+  - **Bloom Filters**:[Bloom filters](https://brilliant.org/wiki/bloom-filter) are built for each SSTable to help quickly reject non-existent keys, avoiding unnecessary disk reads.
 ---
 
 ### Scaling Types
 
 - **Horizontal Scaling (Scale-Out)**  
-  The system supports adding more nodes (shards or replicas) to distribute the load. Keys are partitioned across shards using consistent hashing, allowing efficient horizontal growth.
+  The system supports adding more nodes (shards or replicas) to distribute the load. Keys are partitioned across shards using [consistent hashing](https://www.hellointerview.com/learn/system-design/deep-dives/consistent-hashing), allowing efficient horizontal growth.
 
 - **Vertical Scaling (Scale-Up)**  
   Each node can independently handle increased load by using efficient concurrency with Goroutines and optimizing storage with BadgerDB’s low-overhead design.
@@ -121,10 +121,15 @@ Strong consistency can be added with protocols like Raft or Paxos in the future 
 
 ---
 
-## Getting Started
+## References
+This project was inspired by a few projects, books and blog posts, it's based on them with things changed to the way I like
+- [Go, for Distributed Systems by Russ Cox](https://go.dev/talks/2013/distsys.slide#1)
+- [Designing Data-Intensive Applications by Martin Kleppmann](https://www.amazon.com/Designing-Data-Intensive-Applications-Reliable-Maintainable/dp/1449373321)
+- [Patterns of Distributed Systems by Unmesh Joshi](https://martinfowler.com/books/patterns-distributed.html)
+- [Distributed key-value database series on YouTube](https://www.youtube.com/playlist?list=PLWwSgbaBp9XrMkjEhmTIC37WX2JfwZp7I)
+- [BadgerDB docs](https://docs.hypermode.com/badger/overview)
+- [Go package for bloom filters](https://github.com/bits-and-blooms/bloom)
+- [Arpit Bhayani short tutorials](https://www.youtube.com/@AsliEngineering)
+- and LLM 
 
-```bash
-git clone https://github.com/Sagor0078/distribKV.git
-cd distribKV
-```
 

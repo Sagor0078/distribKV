@@ -9,7 +9,7 @@ import (
 	"github.com/dgraph-io/badger/v4"
 )
 
-func main() {
+func InitBadger() {
 	// Open BadgerDB in a local directory
 	opts := badger.DefaultOptions("./badgerdb").WithLoggingLevel(badger.INFO)
 	db, err := badger.Open(opts)
